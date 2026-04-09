@@ -1,22 +1,26 @@
-def sample(speed=None, **kwargs):
-    """
-    Executes logic based on the keyword arguments passed from the main interpreter.
-    """
-    print("\n--- Executing sample.py ---")
+import time
 
-    if speed is not None:
-        print(f"Action: Running sample script. Speed confirmed at: {speed}")
-    else:
-        print("Action: Running sample script with default speed.")
+class SamplesManager():
+    def __init__(self, slot_id, log_queue, **kwargs):
+        pass
 
-    # Catch any additional parameters passed from the document
-    if kwargs:
-        for key, value in kwargs.items():
-            print(f"Additional parameter received -> {key}: {value}")
+    def sample(self, slot_id, log_queue, speed="0", user="Unknown", **kwargs):
+        """
+        Modified to pipe output to the log_queue instead of direct printing.
+        """
+        def log(msg):
+            log_queue.put((slot_id, msg))
 
-    print("--- Finished sample.py ---\n")
+        log(f"--- [EVENT START: sample.py] ---")
+        log(f"Target Speed: {speed}")
+        log(f"Authorized User: {user}")
 
+        # Simulated work to demonstrate interleaving
+        for i in range(10000000):
+            log(f"speed1={speed} and index={i}")
+            time.sleep(0.5)
 
-# Optional: Allow the script to be run independently for testing
-if __name__ == "__main__":
-    sample(speed=5, velocity=15)
+        if kwargs:
+            log(f"Extended Metadata: {kwargs}")
+
+        log("--- [EVENT FINISHED] ---")
