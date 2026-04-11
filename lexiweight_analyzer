@@ -1,0 +1,126 @@
+import os
+import csv
+from collections import Counter
+
+def load_custom_weights(csv_path):
+    """
+    Loads character weights from a CSV. 
+    Format expected: character,weight (e.g., 'a,50')
+    """
+    weights = {}
+    if not csv_path:
+        return weights
+    
+    try:
+        with open(csv_path, mode='r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) >= 2:
+                    char, weight = row, row
+                    # Handle special case for 'space' or 'comma' if written as words
+                    if char.lower() == 'space': char = ' '
+                    if char.lower() == 'comma': char = ','
+                    weights[char] = float(weight)
+        return weights
+    except Exception as e:
+        print(f"Warning: Could not load CSV weights ({e}). Using ASCII defaults.")
+        return {}
+
+def get_char_weight(char, custom_weights):
+    """
+    Determines weight: Custom CSV value -> ASCII -> Floor of 1.
+    """
+    # 1. Check Custom CSV
+    if char in custom_weights:
+        val = custom_weights[char]
+    else:
+        # 2. Fallback to ASCII
+        val = ord(char)
+    
+    # 3. Avoid Zero (Floor of 1)
+    return max(1.0, val)
+
+def get_weighted_breakdown(segment, freq_map, custom_weights, global_mult):
+    """
+    Calculates: (CharacterWeight * GlobalMultiplier * Frequency)
+    """
+    if not segment:
+        return ""
+
+    parts = []
+    segment_sum = 0
+
+    for char in segment:
+        weight = get_char_weight(char, custom_weights)
+        freq = freq_map[char]
+        char_total = weight * global_mult * freq
+        segment_sum += char_total
+        parts.append(f"({weight}*{global_mult}*{freq})")
+
+    calculation = "+".join(parts)
+    return f"{calculation}={round(segment_sum, 2)}"
+
+def process_content(text, custom_weights, global_mult):
+    freq_map = Counter(text)
+    result = []
+    current_chunk = []
+    total_sum = 0
+
+    for char in text:
+        if not char.isspace():
+            current_chunk.append(char)
+        else:
+            if current_chunk:
+                breakdown = get_weighted_breakdown("".join(current_chunk), freq_map, custom_weights, global_mult)
+                total_sum += float(breakdown.split('=')[-1])
+                result.append(breakdown)
+                current_chunk = []
+            result.append(char)
+
+    if current_chunk:
+        breakdown = get_weighted_breakdown("".join(current_chunk), freq_map, custom_weights, global_mult)
+        total_sum += float(breakdown.split('=')[-1])
+        result.append(breakdown)
+
+    return "".join(result), freq_map, total_sum
+
+def main():
+    print("--- Hybrid Weighted Character Analysis ---")
+    
+    # 1. Setup Weights
+    csv_path = input("Enter path to custom weights CSV (leave blank for ASCII only): ").strip().replace('"', '')
+    custom_weights = load_custom_weights(csv_path)
+    
+    try:
+        global_mult = float(input("Enter global multiplier (default 1.0): ") or 1.0)
+    except ValueError:
+        global_mult = 1.0
+
+    # 2. Get Input
+    choice = input("Convert (F)ile or (S)tring? ").strip().lower()
+    content = ""
+    origin_path = ""
+
+    if choice == 's':
+        content = input("Enter text: ")
+    elif choice == 'f':
+        origin_path = input("Enter path to text file: ").strip().replace('"', '')
+        with open(origin_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+    # 3. Process
+    output_text, frequencies, final_total = process_content(content, custom_weights, global_mult)
+
+    # 4. Output
+    print(f"\n--- Analysis Complete ---")
+    print(f"Grand Total: {round(final_total, 2)}")
+    print(f"\nBreakdown:\n{output_text}")
+
+    if choice == 'f':
+        out_path = os.path.join(os.path.dirname(origin_path), f"analyzed_{os.path.basename(origin_path)}")
+        with open(out_path, 'w', encoding='utf-8') as f:
+            f.write(output_text)
+        print(f"\nDetailed file saved to: {out_path}")
+
+if __name__ == "__main__":
+    main()
